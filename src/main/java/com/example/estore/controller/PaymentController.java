@@ -1,5 +1,6 @@
 package com.example.estore.controller;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import org.json.JSONObject;
@@ -14,7 +15,6 @@ import jakarta.annotation.PostConstruct;
 
 @RestController
 @RequestMapping("/api/payment")
-@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 public class PaymentController {
 
     private RazorpayClient razorpayClient;
@@ -25,7 +25,6 @@ public class PaymentController {
     @Value("${razorpay.key_secret}")
     private String keySecret;
 
- 
     @PostConstruct
     public void init() throws Exception {
         this.razorpayClient = new RazorpayClient(keyId, keySecret);
@@ -33,23 +32,40 @@ public class PaymentController {
 
     @PostMapping("/create-order")
     public ResponseEntity<?> createOrder(@RequestBody Map<String, Object> data) {
-
         try {
+            if (!data.containsKey("amount")) {
+                return ResponseEntity.badRequest().body("Amount is required");
+            }
+
+            int amount;
+            try {
+                amount = Integer.parseInt(data.get("amount").toString());
+            } catch (NumberFormatException e) {
+                return ResponseEntity.badRequest().body("Invalid amount format");
+            }
+
+            if (amount <= 0) {
+                return ResponseEntity.badRequest().body("Amount must be greater than 0");
+            }
+
             JSONObject options = new JSONObject();
-
-            int amount = (int) data.get("amount");
-
-            options.put("amount", amount * 100); // ₹ → paise
+            options.put("amount", amount * 100);
             options.put("currency", "INR");
 
+           
             Order order = razorpayClient.orders.create(options);
 
-            return ResponseEntity.ok(order.toString());
+          
+            Map<String, Object> response = new HashMap<>();
+            response.put("orderId", order.get("id"));
+            response.put("amount", order.get("amount"));
+            response.put("currency", order.get("currency"));
+
+            return ResponseEntity.ok(response);
 
         } catch (Exception e) {
-            return ResponseEntity
-                    .badRequest()
-                    .body("Payment failed: " + e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body("Payment creation failed: " + e.getMessage());
         }
     }
 }

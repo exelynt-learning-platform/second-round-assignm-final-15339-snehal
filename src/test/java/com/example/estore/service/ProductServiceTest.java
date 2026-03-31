@@ -1,8 +1,9 @@
 package com.example.estore.service;
 
+import com.example.estore.enums.Category;
 import com.example.estore.model.Product;
 import com.example.estore.repository.ProductRepository;
-import com.example.estore.enums.Category;
+import com.example.estore.dto.ProductRequest;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,6 +26,7 @@ class ProductServiceTest {
     @InjectMocks
     private ProductService productService;
 
+    // ---------------- TEST GET ALL ----------------
     @Test
     void testGetAll() {
         Product p = new Product();
@@ -35,8 +37,10 @@ class ProductServiceTest {
         List<Product> result = productService.getAll();
 
         assertEquals(1, result.size());
+        assertEquals("Laptop", result.get(0).getTitle());
     }
 
+    // ---------------- TEST GET BY ID ----------------
     @Test
     void testGetById() {
         Product p = new Product();
@@ -56,25 +60,41 @@ class ProductServiceTest {
         assertThrows(RuntimeException.class, () -> productService.getById(1L));
     }
 
+    // ---------------- TEST ADD PRODUCT ----------------
     @Test
     void testAddProduct() {
-        Product p = new Product();
-        p.setTitle("Phone");
+        ProductRequest req = new ProductRequest();
+        req.setTitle("Phone");
+        req.setDescription("Smartphone");
+        req.setPrice(1500.0);
+        req.setCategory(Category.ELECTRONICS);
+        req.setStock(10);
+        req.setImage("phone.jpg");
 
-        Mockito.when(productRepository.save(p)).thenReturn(p);
+        Product savedProduct = new Product();
+        savedProduct.setTitle(req.getTitle());
 
-        Product result = productService.add(p);
+        Mockito.when(productRepository.save(Mockito.any(Product.class))).thenReturn(savedProduct);
+
+        Product result = productService.add(req);
 
         assertEquals("Phone", result.getTitle());
     }
 
+    // ---------------- TEST UPDATE PRODUCT ----------------
     @Test
     void testUpdateProduct() {
         Product existing = new Product();
         existing.setId(1L);
+        existing.setTitle("Old Title");
 
-        Product updated = new Product();
+        ProductRequest updated = new ProductRequest();
         updated.setTitle("Updated");
+        updated.setDescription("Updated Description");
+        updated.setPrice(2000.0);
+        updated.setCategory(Category.ELECTRONICS);
+        updated.setStock(5);
+        updated.setImage("updated.jpg");
 
         Mockito.when(productRepository.findById(1L)).thenReturn(Optional.of(existing));
         Mockito.when(productRepository.save(existing)).thenReturn(existing);
@@ -82,14 +102,18 @@ class ProductServiceTest {
         Product result = productService.update(1L, updated);
 
         assertEquals("Updated", result.getTitle());
+        assertEquals("Updated Description", result.getDescription());
+        assertEquals(2000.0, result.getPrice());
     }
 
+    // ---------------- TEST DELETE PRODUCT ----------------
     @Test
     void testDelete() {
         productService.delete(1L);
         Mockito.verify(productRepository).deleteById(1L);
     }
 
+    // ---------------- TEST GET BY CATEGORY ----------------
     @Test
     void testGetByCategory() {
         Product p = new Product();
@@ -109,6 +133,7 @@ class ProductServiceTest {
                 () -> productService.getByCategory("wrong"));
     }
 
+    // ---------------- TEST SEARCH PRODUCTS ----------------
     @Test
     void testSearchProducts() {
         Product p = new Product();

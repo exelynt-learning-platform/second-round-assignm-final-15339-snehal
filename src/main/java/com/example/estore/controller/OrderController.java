@@ -1,111 +1,60 @@
 package com.example.estore.controller;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
+
+import com.example.estore.dto.CreateOrderRequest;
+import com.example.estore.dto.OrderItemRequest;
 import com.example.estore.model.*;
 import com.example.estore.service.OrderService;
 
 @RestController
 @RequestMapping("/api/orders")
-@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 public class OrderController {
 
     @Autowired
     private OrderService orderService;
 
+    // ✅ CLEAN CREATE ORDER
     @PostMapping("/create")
-    public ResponseEntity<?> createOrder(@RequestBody Map<String, Object> payload) {
+    public ResponseEntity<?> createOrder(@Valid @RequestBody CreateOrderRequest request) {
 
-        try {
-          
-            if (!payload.containsKey("userId")) {
-                return ResponseEntity.badRequest().body("User ID is required");
-            }
+        List<OrderItem> items = request.getItems().stream().map(itemReq -> {
+            OrderItem item = new OrderItem();
 
-            Long userId = Long.valueOf(payload.get("userId").toString());
+            Product product = new Product();
+            product.setId(itemReq.getProductId());
 
-          
-            Object itemsObj = payload.get("items");
-            if (!(itemsObj instanceof List)) {
-                return ResponseEntity.badRequest().body("Items must be a list");
-            }
+            item.setProduct(product);
+            item.setQuantity(itemReq.getQuantity());
+            item.setPrice(itemReq.getPrice());
 
-            List<?> rawItems = (List<?>) itemsObj;
-            if (rawItems.isEmpty()) {
-                return ResponseEntity.badRequest().body("Order items cannot be empty");
-            }
+            return item;
+        }).collect(Collectors.toList());
 
-            List<OrderItem> items = new ArrayList<>();
-
-            for (Object obj : rawItems) {
-
-                if (!(obj instanceof Map)) {
-                    return ResponseEntity.badRequest().body("Invalid item format");
-                }
-
-                Map<?, ?> itemMap = (Map<?, ?>) obj;
-
-           
-                Object productIdObj = itemMap.get("productId");
-                Object quantityObj = itemMap.get("quantity");
-                Object priceObj = itemMap.get("price");
-
-                if (productIdObj == null || quantityObj == null || priceObj == null) {
-                    return ResponseEntity.badRequest().body("Missing productId/quantity/price");
-                }
-
-                Long productId = Long.valueOf(productIdObj.toString());
-                Integer quantity = Integer.valueOf(quantityObj.toString());
-                Double price = Double.valueOf(priceObj.toString());
-
-              
-                if (quantity <= 0) {
-                    return ResponseEntity.badRequest().body("Quantity must be greater than 0");
-                }
-
-                if (price <= 0) {
-                    return ResponseEntity.badRequest().body("Price must be greater than 0");
-                }
-
-                
-                OrderItem item = new OrderItem();
-                Product product = new Product();
-                product.setId(productId);
-
-                item.setProduct(product);
-                item.setQuantity(quantity);
-                item.setPrice(price);
-
-                items.add(item);
-            }
-
-            Order order = orderService.createOrder(userId, items);
-            return ResponseEntity.ok(order);
-
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Invalid request format");
-        }
+        Order order = orderService.createOrder(request.getUserId(), items);
+        return ResponseEntity.ok(order);
     }
 
-   
+    // ✅ USER ORDERS
     @GetMapping("/user/{userId}")
     public ResponseEntity<?> getUserOrders(@PathVariable Long userId) {
         return ResponseEntity.ok(orderService.getOrdersByUser(userId));
     }
 
-   
+    // ✅ ALL ORDERS
     @GetMapping("/all")
     public ResponseEntity<?> getAllOrders() {
         return ResponseEntity.ok(orderService.getAllOrders());
     }
 
-   
+    // ✅ DELETE ORDER
     @DeleteMapping("/{orderId}")
     public ResponseEntity<?> deleteOrder(@PathVariable Long orderId) {
         orderService.deleteOrder(orderId);

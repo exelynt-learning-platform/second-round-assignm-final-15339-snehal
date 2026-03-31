@@ -1,6 +1,7 @@
 package com.example.estore.service;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -24,7 +25,7 @@ public class CartService {
     @Autowired
     private UserRepository userRepository;
 
-  
+
     public CartItem addToCart(CartItem item) {
 
         if (item.getUser() == null || item.getUser().getId() == null) {
@@ -49,12 +50,13 @@ public class CartService {
             throw new IllegalArgumentException("Insufficient stock available");
         }
 
-        
-        CartItem existingItem = cartRepository
-                .findByUserIdAndProductId(user.getId(), product.getId())
-                .orElse(null);
+        Optional<CartItem> existingItemOpt =
+                cartRepository.findByUserIdAndProductId(user.getId(), product.getId());
 
-        if (existingItem != null) {
+       
+        if (existingItemOpt.isPresent()) {
+            CartItem existingItem = existingItemOpt.get();
+
             int newQuantity = existingItem.getQuantity() + item.getQuantity();
 
             if (product.getStock() < newQuantity) {
@@ -65,6 +67,7 @@ public class CartService {
             return cartRepository.save(existingItem);
         }
 
+      
         item.setUser(user);
         item.setProduct(product);
 
@@ -76,12 +79,12 @@ public class CartService {
         return cartRepository.findByUserId(userId);
     }
 
-    
+   
     public void clearCart(Long userId) {
         cartRepository.deleteByUserId(userId);
     }
 
-   
+  
     public CartItem updateQuantity(Long itemId, int quantity) {
 
         if (quantity <= 0) {
@@ -109,7 +112,7 @@ public class CartService {
         cartRepository.deleteById(itemId);
     }
 
-    
+  
     public int getCartCountByUserId(Long userId) {
         return cartRepository.countByUserId(userId);
     }

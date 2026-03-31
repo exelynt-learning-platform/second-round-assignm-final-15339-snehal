@@ -1,6 +1,7 @@
 package com.example.estore.controller;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 
@@ -12,6 +13,8 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
+
 import com.example.estore.dto.*;
 import com.example.estore.enums.Role;
 import com.example.estore.model.User;
@@ -20,7 +23,6 @@ import com.example.estore.util.JwtUtil;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 public class AuthController {
 
     @Autowired
@@ -35,39 +37,33 @@ public class AuthController {
     @Autowired
     private JavaMailSender mailSender;
 
-    // ✅ Admin email from env
     @Value("${app.admin.email}")
     private String adminEmail;
 
-    // ✅ Reusable token method
+    // -------------------
+    // JWT TOKEN GENERATOR
+    // -------------------
     private String generateToken(User user) {
         String role = (user.getRole() != null) ? user.getRole().name() : "USER";
         return jwtUtil.generateToken(user.getEmail(), user.getName(), role);
     }
 
-    // ---------------- SIGNUP ----------------
+    // -------------------
+    // SIGNUP
+    // -------------------
     @PostMapping("/signup")
-    public ResponseEntity<?> signup(@RequestBody SignupRequest request) {
-
-        if (request.getEmail() == null || request.getPassword() == null) {
-            return ResponseEntity.badRequest().body("Email and password are required!");
-        }
+    public ResponseEntity<?> signup(@Valid @RequestBody SignupRequest request) {
 
         if (userRepo.findByEmail(request.getEmail()).isPresent()) {
-            return ResponseEntity.badRequest().body(new AuthResponse("Email already exists!", false));
+            return ResponseEntity.badRequest()
+                    .body(new AuthResponse("Email already exists!", false));
         }
 
         User user = new User();
         user.setName(request.getName());
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-
-        // ✅ No hardcoded email
-        if (request.getEmail().equalsIgnoreCase(adminEmail)) {
-            user.setRole(Role.ADMIN);
-        } else {
-            user.setRole(Role.USER);
-        }
+        user.setRole(request.getEmail().equalsIgnoreCase(adminEmail) ? Role.ADMIN : Role.USER);
 
         userRepo.save(user);
 
@@ -79,9 +75,11 @@ public class AuthController {
         );
     }
 
-    // ---------------- LOGIN ----------------
+    // -------------------
+    // LOGIN
+    // -------------------
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
 
         Optional<User> userOpt = userRepo.findByEmail(request.getEmail());
 
@@ -105,7 +103,9 @@ public class AuthController {
         );
     }
 
-    // ---------------- GET CURRENT USER ----------------
+    // -------------------
+    // GET CURRENT USER
+    // -------------------
     @GetMapping("/me")
     public ResponseEntity<?> getCurrentUser(
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
@@ -119,22 +119,39 @@ public class AuthController {
             String email = jwtUtil.extractEmail(token);
 
             User user = userRepo.findByEmail(email)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-            return ResponseEntity.ok(user);
+            UserResponse response = new UserResponse(
+                    user.getId(),
+                    user.getName(),
+                    user.getEmail(),
+                    user.getRole().name()
+            );
+
+            return ResponseEntity.ok(response);
 
         } catch (Exception e) {
             return ResponseEntity.status(401).body("Invalid or expired token");
         }
     }
 
-    // ---------------- UPDATE USER ----------------
+    // -------------------
+    // UPDATE USER
+    // -------------------
     @PutMapping("/update/{id}")
     public ResponseEntity<?> updateUser(@PathVariable Long id,
                                         @RequestBody UpdateUserRequest updates) {
 
         User user = userRepo.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        // Prevent duplicate email
+        if (updates.getEmail() != null &&
+            userRepo.findByEmail(updates.getEmail())
+                    .filter(existing -> !existing.getId().equals(id))
+                    .isPresent()) {
+            return ResponseEntity.badRequest().body("Email already in use!");
+        }
 
         if (updates.getName() != null) user.setName(updates.getName());
         if (updates.getEmail() != null) user.setEmail(updates.getEmail());
@@ -149,47 +166,51 @@ public class AuthController {
         return ResponseEntity.ok("User updated successfully!");
     }
 
-    // ---------------- DELETE USER ----------------
+    // -------------------
+    // DELETE USER
+    // -------------------
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<?> deleteUser(@PathVariable Long id) {
 
         User user = userRepo.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         userRepo.delete(user);
         return ResponseEntity.ok("User deleted successfully!");
     }
 
-    // ---------------- FORGOT PASSWORD ----------------
+    // -------------------
+    // FORGOT PASSWORD
+    // -------------------
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
 
         String email = request.get("email");
-
         if (email == null || email.trim().isEmpty()) {
             return ResponseEntity.badRequest().body("Email is required!");
         }
 
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         String otp = String.format("%06d", new Random().nextInt(999999));
-
         user.setResetOtp(otp);
         user.setOtpExpiry(LocalDateTime.now().plusMinutes(10));
+
         userRepo.save(user);
 
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(user.getEmail());
         message.setSubject("Password Reset OTP");
-        message.setText("Your OTP is: " + otp);
-
+        message.setText("Your OTP is: " + otp + "\nValid for 10 minutes.");
         mailSender.send(message);
 
         return ResponseEntity.ok("OTP sent successfully!");
     }
 
-    // ---------------- RESET PASSWORD ----------------
+    // -------------------
+    // RESET PASSWORD
+    // -------------------
     @PostMapping("/reset-password")
     public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> request) {
 
@@ -197,20 +218,22 @@ public class AuthController {
         String otp = request.get("otp");
         String newPassword = request.get("newPassword");
 
+        if (email == null || otp == null || newPassword == null) {
+            return ResponseEntity.badRequest().body("All fields are required!");
+        }
+
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         if (user.getResetOtp() == null || !user.getResetOtp().equals(otp)) {
             return ResponseEntity.badRequest().body("Invalid OTP!");
         }
 
-        // ✅ FIXED NPE
-        if (user.getOtpExpiry() == null ||
-                user.getOtpExpiry().isBefore(LocalDateTime.now())) {
+        if (user.getOtpExpiry() == null || user.getOtpExpiry().isBefore(LocalDateTime.now())) {
             return ResponseEntity.badRequest().body("OTP expired!");
         }
 
-        if (newPassword == null || newPassword.trim().isEmpty()) {
+        if (newPassword.trim().isEmpty()) {
             return ResponseEntity.badRequest().body("Password cannot be empty!");
         }
 

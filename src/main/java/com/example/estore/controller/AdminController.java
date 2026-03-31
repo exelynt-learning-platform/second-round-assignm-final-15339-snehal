@@ -17,8 +17,8 @@ import com.example.estore.repository.UserRepository;
 
 @RestController
 @RequestMapping("/api/admin")
-@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
-@PreAuthorize("hasRole('ADMIN')")   
+
+@PreAuthorize("hasAuthority('ADMIN')")   
 public class AdminController {
 
     @Autowired
@@ -27,23 +27,28 @@ public class AdminController {
     @Autowired
     private ProductRepository productRepo;
 
-  
-
+    // ---------------- GET ALL USERS ----------------
     @GetMapping("/users")
     public ResponseEntity<?> getAllUsers() {
         List<User> users = userRepo.findAll();
+        users.forEach(u -> {
+            u.setPassword(null);  // hide sensitive data
+            u.setResetOtp(null);
+            u.setOtpExpiry(null);
+        });
         return ResponseEntity.ok(users);
     }
 
+    // ---------------- GET ALL PRODUCTS ----------------
     @GetMapping("/products")
     public ResponseEntity<?> getAllProducts() {
         List<Product> products = productRepo.findAll();
         return ResponseEntity.ok(products);
     }
 
+    // ---------------- DELETE USER ----------------
     @DeleteMapping("/delete-user/{id}")
     public ResponseEntity<?> deleteUser(@PathVariable Long id) {
-
         Optional<User> userOpt = userRepo.findById(id);
         if (userOpt.isEmpty()) {
             return ResponseEntity.status(404).body("User not found!");
@@ -53,6 +58,7 @@ public class AdminController {
         return ResponseEntity.ok("User deleted successfully!");
     }
 
+    // ---------------- UPDATE USER ROLE ----------------
     @PutMapping("/update-role/{id}")
     public ResponseEntity<?> updateUserRole(
             @PathVariable Long id,
@@ -66,7 +72,7 @@ public class AdminController {
         User user = userOpt.get();
         String newRoleStr = request.get("role");
 
-        if (newRoleStr == null || newRoleStr.isEmpty()) {
+        if (newRoleStr == null || newRoleStr.trim().isEmpty()) {
             return ResponseEntity.badRequest().body("Role is required!");
         }
 

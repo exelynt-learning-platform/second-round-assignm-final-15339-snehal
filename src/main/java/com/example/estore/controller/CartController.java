@@ -4,60 +4,58 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import jakarta.validation.Valid;
 
 import com.example.estore.model.CartItem;
 import com.example.estore.service.CartService;
 
 @RestController
 @RequestMapping("/api/cart")
-@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 public class CartController {
 
     @Autowired
     private CartService cartService;
 
-    
+    // ✅ ADD TO CART
     @PostMapping("/add")
-    public CartItem addToCart(@RequestBody CartItem item) {
-        return cartService.addToCart(item);
+    public ResponseEntity<?> addToCart(@Valid @RequestBody CartItem item) {
+        return ResponseEntity.ok(cartService.addToCart(item));
     }
 
-   
+    // ✅ GET CART
     @GetMapping
-    public List<CartItem> getCart(@RequestParam Long userId) {
-        return cartService.getCart(userId);
+    public ResponseEntity<List<CartItem>> getCart(@RequestParam Long userId) {
+        return ResponseEntity.ok(cartService.getCart(userId));
     }
 
- 
+    // ✅ CLEAR CART
     @DeleteMapping("/clear/{userId}")
-    public void clearCart(@PathVariable Long userId) {
+    public ResponseEntity<?> clearCart(@PathVariable Long userId) {
         cartService.clearCart(userId);
+        return ResponseEntity.ok("Cart cleared successfully");
     }
-    
+
+    // ✅ UPDATE QUANTITY
     @PutMapping("/{itemId}")
-    public CartItem updateQuantity(@PathVariable Long itemId, @RequestBody CartItem updatedItem) {
-        return cartService.updateQuantity(itemId, updatedItem.getQuantity());
+    public ResponseEntity<?> updateQuantity(@PathVariable Long itemId,
+                                            @RequestBody CartItem updatedItem) {
+        return ResponseEntity.ok(
+                cartService.updateQuantity(itemId, updatedItem.getQuantity())
+        );
     }
-    
+
+    // ✅ REMOVE ITEM
     @DeleteMapping("/{itemId}")
-    public void removeItem(@PathVariable Long itemId) {
+    public ResponseEntity<?> removeItem(@PathVariable Long itemId) {
         cartService.removeItem(itemId);
+        return ResponseEntity.ok("Item removed successfully");
     }
-    
+
+    // ✅ CART COUNT
     @GetMapping("/count/{userId}")
     public ResponseEntity<Integer> getCartCount(@PathVariable Long userId) {
-        int count = cartService.getCartCountByUserId(userId);
-        return ResponseEntity.ok(count);
+        return ResponseEntity.ok(cartService.getCartCountByUserId(userId));
     }
-
 }

@@ -21,7 +21,7 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
         String adminEmail = "tikolesnehal@gmail.com";
-        String adminPassword = "Admin@123"; // default password
+        String adminPassword = "Admin@123";
         String adminName = "Snehal Admin";
 
         if (userRepo.findByEmail(adminEmail).isEmpty()) {

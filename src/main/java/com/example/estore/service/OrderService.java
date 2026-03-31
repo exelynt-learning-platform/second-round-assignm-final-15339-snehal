@@ -4,9 +4,11 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.example.estore.model.Order;
 import com.example.estore.model.OrderItem;
+import com.example.estore.model.Product;
 import com.example.estore.model.User;
 import com.example.estore.repository.OrderItemRepository;
 import com.example.estore.repository.OrderRepository;
@@ -28,45 +30,78 @@ public class OrderService {
     @Autowired
     private ProductRepository productRepository;
 
-  
+
+    @Transactional
     public Order createOrder(Long userId, List<OrderItem> items) {
-    
+
+     
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        double total = items.stream()
-                .mapToDouble(i -> i.getPrice() * i.getQuantity())
-                .sum();
+        double total = 0;
 
-      
+       
         Order order = new Order();
         order.setUser(user);
-        order.setTotalPrice(total);
         order = orderRepository.save(order);
 
-        
+      
         for (OrderItem item : items) {
+
+            Product product = productRepository.findById(item.getProduct().getId())
+                    .orElseThrow(() -> new IllegalArgumentException("Product not found"));
+
+         
+            if (product.getStock() < item.getQuantity()) {
+                throw new IllegalArgumentException("Insufficient stock for product: " + product.getTitle());
+            }
+
+       
+            product.setStock(product.getStock() - item.getQuantity());
+            productRepository.save(product);
+
+         
             item.setOrder(order);
+            item.setProduct(product);
+
+           
+            total += item.getPrice() * item.getQuantity();
+
             orderItemRepository.save(item);
         }
 
-        return order; 
-    }
+      
+        order.setTotalPrice(total);
 
-
-    public List<Order> getOrdersByUser(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        return orderRepository.findByUser(user);
+        return orderRepository.save(order);
     }
 
    
+    public List<Order> getOrdersByUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        return orderRepository.findByUser(user);
+    }
+
+
     public List<Order> getAllOrders() {
         return orderRepository.findAll();
     }
-    
-    public void deleteOrder(Long orderId) {
-        orderRepository.deleteById(orderId);
-    }
 
+    
+    @Transactional
+    public void deleteOrder(Long orderId) {
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found"));
+
+        for (OrderItem item : order.getItems()) {
+            Product product = item.getProduct();
+            product.setStock(product.getStock() + item.getQuantity());
+            productRepository.save(product);
+        }
+
+        orderRepository.delete(order);
+    }
 }

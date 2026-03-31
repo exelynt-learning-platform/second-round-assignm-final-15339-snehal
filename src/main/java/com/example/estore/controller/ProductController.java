@@ -5,7 +5,6 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
+import com.example.estore.dto.ProductRequest;
 import com.example.estore.model.Product;
 import com.example.estore.service.ProductService;
 
@@ -21,7 +21,6 @@ import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/products")
-@CrossOrigin(origins = "http://localhost:3000")
 public class ProductController {
 
     private static final Logger logger = LoggerFactory.getLogger(ProductController.class);
@@ -32,7 +31,6 @@ public class ProductController {
     @Autowired
     private Cloudinary cloudinary;
 
-  
     @GetMapping
     public ResponseEntity<?> getAll() {
         return ResponseEntity.ok(productService.getAll());
@@ -40,45 +38,34 @@ public class ProductController {
 
     @GetMapping("/{id}")
     public ResponseEntity<?> getById(@PathVariable Long id) {
-        try {
-            return ResponseEntity.ok(productService.getById(id));
-        } catch (RuntimeException e) {   // ✅ specific exception
-            return ResponseEntity.status(404).body("Product not found");
-        }
+        return ResponseEntity.ok(productService.getById(id));
     }
 
-  
+
     @PostMapping
-    public ResponseEntity<?> add(@Valid @RequestBody Product product) {
-        return ResponseEntity.ok(productService.add(product));
-    }
-
-  
-    @PutMapping("/{id}")
-    public ResponseEntity<?> update(@PathVariable Long id, @Valid @RequestBody Product updatedProduct) {
-        try {
-            return ResponseEntity.ok(productService.update(id, updatedProduct));
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(404).body("Product not found");
-        }
+    public ResponseEntity<?> add(@Valid @RequestBody ProductRequest request) {
+        return ResponseEntity.ok(productService.add(request));
     }
 
    
+    @PutMapping("/{id}")
+    public ResponseEntity<?> update(@PathVariable Long id,
+                                    @Valid @RequestBody ProductRequest request) {
+        return ResponseEntity.ok(productService.update(id, request));
+    }
+
+    
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(@PathVariable Long id) {
-        try {
-            productService.delete(id);
-            return ResponseEntity.ok("Product deleted successfully!");
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(404).body("Product not found");
-        }
+        productService.delete(id);
+        return ResponseEntity.ok("Product deleted successfully!");
     }
 
-   
+
     @PostMapping("/upload")
     public ResponseEntity<?> uploadImage(@RequestParam("file") MultipartFile file) {
 
-        if (file.isEmpty()) {
+        if (file == null || file.isEmpty()) {
             return ResponseEntity.badRequest().body("File is empty");
         }
 
@@ -96,13 +83,10 @@ public class ProductController {
         }
     }
 
+    
     @GetMapping("/category/{category}")
     public ResponseEntity<?> getProductsByCategory(@PathVariable String category) {
-        try {
-            return ResponseEntity.ok(productService.getByCategory(category));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body("Invalid category: " + category);
-        }
+        return ResponseEntity.ok(productService.getByCategory(category));
     }
 
    
