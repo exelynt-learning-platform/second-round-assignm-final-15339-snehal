@@ -1,0 +1,10 @@
+com\example\estore\dto\ChangePasswordRequest.class
+com\example\estore\model\User.class
+com\example\estore\dto\LoginRequest.class
+com\example\estore\dto\AuthResponse.class
+com\example\estore\controller\AuthController.class
+com\example\estore\EstoreApplication.class
+com\example\estore\repository\UserRepository.class
+com\example\estore\dto\SignupRequest.class
+com\example\estore\util\JwtUtil.class
+com\example\estore\config\SecurityConfig.class
