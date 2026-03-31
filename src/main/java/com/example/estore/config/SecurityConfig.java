@@ -3,15 +3,20 @@ package com.example.estore.config;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import com.example.estore.security.JwtFilter;
 
 @Configuration
+@EnableMethodSecurity  
 public class SecurityConfig {
 
     @Autowired
@@ -21,33 +26,39 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http
-                .csrf(csrf -> csrf.disable())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            
+            .csrf(csrf -> csrf
+                .ignoringRequestMatchers("/api/**")   // REST APIs safe
+            )
 
-                .authorizeHttpRequests(auth -> auth
+            .sessionManagement(session ->
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
 
+            .authorizeHttpRequests(auth -> auth
 
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/products/**").permitAll()
+               
+                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/products/**").permitAll()
 
+           
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+             
+                .requestMatchers("/api/cart/**").hasAnyRole("USER", "ADMIN")
+                .requestMatchers("/api/orders/**").hasAnyRole("USER", "ADMIN")
+                .requestMatchers("/api/payment/**").hasAnyRole("USER", "ADMIN")
 
+                .anyRequest().authenticated()
+            )
 
-                        .requestMatchers("/api/cart/**").hasAnyRole("USER", "ADMIN")
-                        .requestMatchers("/api/orders/**").hasAnyRole("USER", "ADMIN")
-                        .requestMatchers("/api/payment/**").hasAnyRole("USER", "ADMIN")
-
-
-                        .anyRequest().authenticated()
-                )
-
-
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+            
+            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
+   
     @Bean
     public BCryptPasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();

@@ -1,23 +1,29 @@
 package com.example.estore.config;
 
-
-
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.cloudinary.Cloudinary;
-import com.cloudinary.utils.ObjectUtils; // ✅ use Cloudinary's ObjectUtils
+import com.cloudinary.utils.ObjectUtils;
 
 @Configuration
 public class CloudinaryConfig {
 
+    @Value("${cloudinary.cloud_name}")
+    private String cloudName;
+
+    @Value("${cloudinary.api_key}")
+    private String apiKey;
+
+    @Value("${cloudinary.api_secret}")
+    private String apiSecret;
+
     @Bean
     public Cloudinary cloudinary() {
         return new Cloudinary(ObjectUtils.asMap(
-                "cloud_name", "dn84fhbnk",
-                "api_key", "354429764493774",
-                "api_secret", "dcvq6jY7dd6-WR9Zj4GRkV8mgs8"
-        ));
+                "cloud_name", cloudName,
+                "api_key", apiKey,
+                "api_secret", apiSecret));
     }
 }
-

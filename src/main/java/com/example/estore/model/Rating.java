@@ -1,17 +1,18 @@
 package com.example.estore.model;
 
-
-
 import jakarta.persistence.Embeddable;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import jakarta.validation.constraints.*;
 
-@Embeddable   
+import lombok.Data;
+
+@Embeddable
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class Rating {
-    private Double rate;
-    private Integer count;
+
+    @Min(value = 0, message = "Rating cannot be less than 0")
+    @Max(value = 5, message = "Rating cannot be more than 5")
+    private double rate;
+
+    @Min(value = 0, message = "Count cannot be negative")
+    private int count;
 }
