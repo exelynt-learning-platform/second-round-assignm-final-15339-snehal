@@ -34,48 +34,43 @@ public class OrderService {
     @Transactional
     public Order createOrder(Long userId, List<OrderItem> items) {
 
-     
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         double total = 0;
 
-       
         Order order = new Order();
         order.setUser(user);
-        order = orderRepository.save(order);
 
-      
+        // Process items first
         for (OrderItem item : items) {
-
             Product product = productRepository.findById(item.getProduct().getId())
-                    .orElseThrow(() -> new IllegalArgumentException("Product not found"));
+                    .orElseThrow(() -> new IllegalArgumentException("Product not found: " + item.getProduct().getId()));
 
-         
-            if (product.getStock() < item.getQuantity()) {
+            if (product.getStock() < item.getQuantity())
                 throw new IllegalArgumentException("Insufficient stock for product: " + product.getTitle());
-            }
 
-       
+            // Reduce stock
             product.setStock(product.getStock() - item.getQuantity());
             productRepository.save(product);
 
-         
+            // Link order
             item.setOrder(order);
             item.setProduct(product);
 
-           
             total += item.getPrice() * item.getQuantity();
+        }
 
+        order.setTotalPrice(total);
+        order = orderRepository.save(order); // Save only once after total is calculated
+
+        // Save items after order is persisted
+        for (OrderItem item : items) {
             orderItemRepository.save(item);
         }
 
-      
-        order.setTotalPrice(total);
-
-        return orderRepository.save(order);
+        return order;
     }
-
    
     public List<Order> getOrdersByUser(Long userId) {
         User user = userRepository.findById(userId)

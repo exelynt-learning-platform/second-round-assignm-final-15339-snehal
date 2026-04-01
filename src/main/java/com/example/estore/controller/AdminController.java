@@ -3,12 +3,14 @@ package com.example.estore.controller;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import com.example.estore.dto.UserDTO;
 import com.example.estore.enums.Role;
 import com.example.estore.model.Product;
 import com.example.estore.model.User;
@@ -17,8 +19,7 @@ import com.example.estore.repository.UserRepository;
 
 @RestController
 @RequestMapping("/api/admin")
-
-@PreAuthorize("hasAuthority('ADMIN')")   
+@PreAuthorize("hasAuthority('ADMIN')")
 public class AdminController {
 
     @Autowired
@@ -30,12 +31,17 @@ public class AdminController {
     // ---------------- GET ALL USERS ----------------
     @GetMapping("/users")
     public ResponseEntity<?> getAllUsers() {
-        List<User> users = userRepo.findAll();
-        users.forEach(u -> {
-            u.setPassword(null);  // hide sensitive data
-            u.setResetOtp(null);
-            u.setOtpExpiry(null);
-        });
+        List<UserDTO> users = userRepo.findAll().stream()
+                .map(u -> new UserDTO(
+                        u.getId(),
+                        u.getName(),
+                        u.getEmail(),
+                        u.getPhone(),
+                        u.getAddress(),
+                        u.getRole()
+                ))
+                .collect(Collectors.toList());
+
         return ResponseEntity.ok(users);
     }
 
@@ -49,8 +55,7 @@ public class AdminController {
     // ---------------- DELETE USER ----------------
     @DeleteMapping("/delete-user/{id}")
     public ResponseEntity<?> deleteUser(@PathVariable Long id) {
-        Optional<User> userOpt = userRepo.findById(id);
-        if (userOpt.isEmpty()) {
+        if (!userRepo.existsById(id)) {
             return ResponseEntity.status(404).body("User not found!");
         }
 

@@ -27,11 +27,18 @@ public class PaymentController {
 
     @PostConstruct
     public void init() throws Exception {
+        if (keyId == null || keySecret == null) {
+            throw new IllegalStateException("Razorpay credentials are not set");
+        }
         this.razorpayClient = new RazorpayClient(keyId, keySecret);
     }
 
     @PostMapping("/create-order")
     public ResponseEntity<?> createOrder(@RequestBody Map<String, Object> data) {
+        if (razorpayClient == null) {
+            return ResponseEntity.status(500).body("Payment gateway not initialized");
+        }
+
         try {
             if (!data.containsKey("amount")) {
                 return ResponseEntity.badRequest().body("Amount is required");
@@ -52,10 +59,8 @@ public class PaymentController {
             options.put("amount", amount * 100);
             options.put("currency", "INR");
 
-           
             Order order = razorpayClient.orders.create(options);
 
-          
             Map<String, Object> response = new HashMap<>();
             response.put("orderId", order.get("id"));
             response.put("amount", order.get("amount"));
@@ -64,7 +69,7 @@ public class PaymentController {
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
-            return ResponseEntity.badRequest()
+            return ResponseEntity.status(500)
                     .body("Payment creation failed: " + e.getMessage());
         }
     }

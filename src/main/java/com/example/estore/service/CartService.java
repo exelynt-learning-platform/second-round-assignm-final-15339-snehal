@@ -25,52 +25,38 @@ public class CartService {
     @Autowired
     private UserRepository userRepository;
 
-
     public CartItem addToCart(CartItem item) {
-
-        if (item.getUser() == null || item.getUser().getId() == null) {
+        if (item.getUser() == null || item.getUser().getId() == null)
             throw new IllegalArgumentException("User is required");
-        }
 
-        if (item.getProduct() == null || item.getProduct().getId() == null) {
+        if (item.getProduct() == null || item.getProduct().getId() == null)
             throw new IllegalArgumentException("Product is required");
-        }
 
-        if (item.getQuantity() <= 0) {
+        if (item.getQuantity() <= 0)
             throw new IllegalArgumentException("Quantity must be greater than 0");
-        }
 
         User user = userRepository.findById(item.getUser().getId())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
         Product product = productRepository.findById(item.getProduct().getId())
                 .orElseThrow(() -> new IllegalArgumentException("Product not found"));
 
-        if (product.getStock() < item.getQuantity()) {
+        if (product.getStock() < item.getQuantity())
             throw new IllegalArgumentException("Insufficient stock available");
-        }
 
-        Optional<CartItem> existingItemOpt =
-                cartRepository.findByUserIdAndProductId(user.getId(), product.getId());
+        Optional<CartItem> existingItemOpt = cartRepository.findByUserIdAndProductId(user.getId(), product.getId());
 
-       
         if (existingItemOpt.isPresent()) {
             CartItem existingItem = existingItemOpt.get();
-
             int newQuantity = existingItem.getQuantity() + item.getQuantity();
-
-            if (product.getStock() < newQuantity) {
+            if (product.getStock() < newQuantity)
                 throw new IllegalArgumentException("Exceeds available stock");
-            }
 
             existingItem.setQuantity(newQuantity);
             return cartRepository.save(existingItem);
         }
 
-      
         item.setUser(user);
         item.setProduct(product);
-
         return cartRepository.save(item);
     }
 

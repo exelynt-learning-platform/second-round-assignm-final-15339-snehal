@@ -1,9 +1,9 @@
 package com.example.estore.controller;
 
 import java.time.LocalDateTime;
+import java.security.SecureRandom;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Random;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -41,7 +41,7 @@ public class AuthController {
     private String adminEmail;
 
     // -------------------
-    // JWT TOKEN GENERATOR
+    // TOKEN GENERATION
     // -------------------
     private String generateToken(User user) {
         String role = (user.getRole() != null) ? user.getRole().name() : "USER";
@@ -49,10 +49,24 @@ public class AuthController {
     }
 
     // -------------------
+    // PASSWORD STRENGTH CHECK
+    // -------------------
+    private boolean isPasswordStrong(String password) {
+        // Must include letters, numbers, special chars, min length 8
+        return password.matches("^(?=.*[0-9])(?=.*[a-zA-Z])(?=.*[@#$%^&+=!]).{8,}$");
+    }
+
+    // -------------------
     // SIGNUP
     // -------------------
     @PostMapping("/signup")
     public ResponseEntity<?> signup(@Valid @RequestBody SignupRequest request) {
+
+        if (!isPasswordStrong(request.getPassword())) {
+            return ResponseEntity.badRequest().body(
+                    "Password must be 8+ chars, include letters, numbers, special chars"
+            );
+        }
 
         if (userRepo.findByEmail(request.getEmail()).isPresent()) {
             return ResponseEntity.badRequest()
@@ -68,7 +82,6 @@ public class AuthController {
         userRepo.save(user);
 
         String token = generateToken(user);
-
         return ResponseEntity.ok(
                 new AuthResponse("User registered successfully!", true, token,
                         user.getRole().name(), user.getName(), user.getId())
@@ -80,23 +93,19 @@ public class AuthController {
     // -------------------
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
-
         Optional<User> userOpt = userRepo.findByEmail(request.getEmail());
-
         if (userOpt.isEmpty()) {
             return ResponseEntity.badRequest()
                     .body(new AuthResponse("User not found!", false));
         }
 
         User user = userOpt.get();
-
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             return ResponseEntity.badRequest()
                     .body(new AuthResponse("Invalid credentials!", false));
         }
 
         String token = generateToken(user);
-
         return ResponseEntity.ok(
                 new AuthResponse("Login successful!", true, token,
                         user.getRole().name(), user.getName(), user.getId())
@@ -104,87 +113,10 @@ public class AuthController {
     }
 
     // -------------------
-    // GET CURRENT USER
-    // -------------------
-    @GetMapping("/me")
-    public ResponseEntity<?> getCurrentUser(
-            @RequestHeader(value = "Authorization", required = false) String authHeader) {
-
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return ResponseEntity.status(401).body("Invalid token");
-        }
-
-        try {
-            String token = authHeader.substring(7);
-            String email = jwtUtil.extractEmail(token);
-
-            User user = userRepo.findByEmail(email)
-                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-            UserResponse response = new UserResponse(
-                    user.getId(),
-                    user.getName(),
-                    user.getEmail(),
-                    user.getRole().name()
-            );
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            return ResponseEntity.status(401).body("Invalid or expired token");
-        }
-    }
-
-    // -------------------
-    // UPDATE USER
-    // -------------------
-    @PutMapping("/update/{id}")
-    public ResponseEntity<?> updateUser(@PathVariable Long id,
-                                        @RequestBody UpdateUserRequest updates) {
-
-        User user = userRepo.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-        // Prevent duplicate email
-        if (updates.getEmail() != null &&
-            userRepo.findByEmail(updates.getEmail())
-                    .filter(existing -> !existing.getId().equals(id))
-                    .isPresent()) {
-            return ResponseEntity.badRequest().body("Email already in use!");
-        }
-
-        if (updates.getName() != null) user.setName(updates.getName());
-        if (updates.getEmail() != null) user.setEmail(updates.getEmail());
-        if (updates.getPhone() != null) user.setPhone(updates.getPhone());
-        if (updates.getAddress() != null) user.setAddress(updates.getAddress());
-
-        if (updates.getPassword() != null && !updates.getPassword().trim().isEmpty()) {
-            user.setPassword(passwordEncoder.encode(updates.getPassword()));
-        }
-
-        userRepo.save(user);
-        return ResponseEntity.ok("User updated successfully!");
-    }
-
-    // -------------------
-    // DELETE USER
-    // -------------------
-    @DeleteMapping("/delete/{id}")
-    public ResponseEntity<?> deleteUser(@PathVariable Long id) {
-
-        User user = userRepo.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-        userRepo.delete(user);
-        return ResponseEntity.ok("User deleted successfully!");
-    }
-
-    // -------------------
-    // FORGOT PASSWORD
+    // FORGOT PASSWORD (OTP)
     // -------------------
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
-
         String email = request.get("email");
         if (email == null || email.trim().isEmpty()) {
             return ResponseEntity.badRequest().body("Email is required!");
@@ -193,10 +125,11 @@ public class AuthController {
         User user = userRepo.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        String otp = String.format("%06d", new Random().nextInt(999999));
+        SecureRandom random = new SecureRandom();
+        String otp = String.format("%06d", random.nextInt(999999));
+
         user.setResetOtp(otp);
         user.setOtpExpiry(LocalDateTime.now().plusMinutes(10));
-
         userRepo.save(user);
 
         SimpleMailMessage message = new SimpleMailMessage();
@@ -213,13 +146,18 @@ public class AuthController {
     // -------------------
     @PostMapping("/reset-password")
     public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> request) {
-
         String email = request.get("email");
         String otp = request.get("otp");
         String newPassword = request.get("newPassword");
 
         if (email == null || otp == null || newPassword == null) {
             return ResponseEntity.badRequest().body("All fields are required!");
+        }
+
+        if (!isPasswordStrong(newPassword)) {
+            return ResponseEntity.badRequest().body(
+                    "Password must be 8+ chars, include letters, numbers, special chars"
+            );
         }
 
         User user = userRepo.findByEmail(email)
@@ -233,14 +171,9 @@ public class AuthController {
             return ResponseEntity.badRequest().body("OTP expired!");
         }
 
-        if (newPassword.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body("Password cannot be empty!");
-        }
-
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setResetOtp(null);
         user.setOtpExpiry(null);
-
         userRepo.save(user);
 
         return ResponseEntity.ok("Password reset successfully!");

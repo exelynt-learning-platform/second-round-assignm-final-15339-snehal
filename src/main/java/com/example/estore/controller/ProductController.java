@@ -64,22 +64,19 @@ public class ProductController {
 
     @PostMapping("/upload")
     public ResponseEntity<?> uploadImage(@RequestParam("file") MultipartFile file) {
-
         if (file == null || file.isEmpty()) {
-            return ResponseEntity.badRequest().body("File is empty");
+            return ResponseEntity.badRequest().body(Map.of("error", "File is empty"));
         }
 
         try {
-            Map<?, ?> uploadResult = cloudinary.uploader()
-                    .upload(file.getBytes(), ObjectUtils.emptyMap());
-
+            Map<?, ?> uploadResult = cloudinary.uploader().upload(file.getBytes(), ObjectUtils.emptyMap());
             String imageUrl = (String) uploadResult.get("secure_url");
 
-            return ResponseEntity.ok(imageUrl);
+            return ResponseEntity.ok(Map.of("imageUrl", imageUrl));
 
         } catch (IOException e) {
             logger.error("Image upload failed", e);
-            return ResponseEntity.status(500).body("Image upload failed");
+            return ResponseEntity.status(500).body(Map.of("error", "Image upload failed"));
         }
     }
 
